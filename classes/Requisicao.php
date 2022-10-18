@@ -4,45 +4,45 @@ namespace classes;
 
 use Exception;
 
-require(__DIR__ . '/QueryUtils.php');
-
-class Requisicao extends QueryUtils
+class Requisicao
 {
     private $_table = '';
     private $_insert = [];
     private $_colunas = [];
-    private $_colunasUpdate = [];
     private $_update = [];
 
+    // Rework needed
     public function addInsert($valores)
     {
         $valores = implode(',', $valores);
         $this->_insert[] = "INSERT INTO {$this->_table} ({$this->_colunas}) VALUES ({$valores})";
     }
 
-    public function addUpdate($valores, $condicoes)
+    public function addUpdate($values, $options)
     {
-        $colunasCount = count($this->_colunas);
-        $valoresCount = count($valores);
-
-        if ($colunasCount !== $valoresCount) {
-            throw new Exception('Valores não correspondem à quantidade de colunas!');
+        $updatePairs = [];
+        foreach ($values as $key => $val) {
+            $updatePairs[$this->_colunas[$key]] = $val;
         }
 
+        $updatePairsSql = '';
+        foreach ($updatePairs as $column => $value) {
+            $updatePairsSql .= "$column = '$value', ";
 
-        for ($i = 0; $i < $colunasCount; $i++) {
-            $this->_colunasUpdate[$i] = "{$this->_colunas[$i]} = '{$valores[$i]}'";
-
-            if (floatval($valores[$i]) > 0) {
-                $this->_colunasUpdate[$i] = "{$this->_colunas[$i]} = {$valores[$i]}";
+            if (floatval($value) > 0) {
+                $updatePairsSql .= "$column = $value, ";
             }
         }
 
-        $condicoes = implode(' ', $condicoes);
-        $colunasUpdate = implode(', ', $this->_colunasUpdate);
-        $colunasUpdate = preg_replace("/\r|\n/", "", $colunasUpdate);
+        $updatePairsSql = rtrim($updatePairsSql, ', ');
+        $updatePairsSql = "UPDATE {$this->_table} SET {$updatePairsSql}";
 
-        $this->_update[] = "UPDATE {$this->_table} SET {$colunasUpdate} WHERE {$condicoes};";
+        if (!empty($options['condicoes'])) {
+            $condicoes = implode(' AND ', $options['condicoes']);
+            $updatePairsSql .= " WHERE {$condicoes}";
+        }
+
+        $this->_update[] = $updatePairsSql;
     }
 
     public function setTable($tableName)
@@ -50,7 +50,7 @@ class Requisicao extends QueryUtils
         $this->_table = $tableName;
     }
 
-    public function setColunas($colunas)
+    public function setColumns($colunas)
     {
         if (!is_array($colunas) || empty($colunas)) {
             throw new InvalidArgumentException('Coluna tem de ser array e não pode estar vazio.');
@@ -95,5 +95,70 @@ class Requisicao extends QueryUtils
         }
 
         return $sql;
+    }
+
+    public function buildFromCsv($filePath, $options = [])
+    {
+        $file = fopen($filePath, 'r');
+        $rowData = [];
+        $lineCounter = 1;
+        $skipRows = empty($options['skip_rows']) ? [] : $options['skip_rows'];
+
+        if (empty($file)) {
+            throw new Exception('Arquivo não encontrado');
+        }
+
+        while (!feof($file)) {
+            $row = fgets($file);
+
+            if (!in_array($lineCounter, $skipRows)) {
+                $rowData = $this->getColumns($row, $options);
+                $this->addUpdate($rowData, $options);
+            };
+
+            $lineCounter++;
+        }
+
+        fclose($file);
+    }
+
+    protected function getColumns($row, $options = [])
+    {
+        $separator = empty($options['separator']) ? ',' : $options['separator'];
+        $columns = empty($options['columns']) ? [] : $options['columns'];
+        $regex = empty($options['remove_regex']) ? '/\r|\n/' : $options['remove_regex'];
+
+        $rowData = preg_replace($regex, '', $row);
+        $rowData = explode($separator, $rowData);
+
+        if (!empty($options['columns'])) {
+            $rowDataSpecificColumns = [];
+
+            foreach ($columns as $index) {
+                $rowDataSpecificColumns[$index - 1] = $rowData[$index - 1];
+            }
+
+            $rowData = $rowDataSpecificColumns;
+        }
+
+        return $rowData;
+    }
+
+    public function sqlToFile($sql, $filename = 'dump')
+    {
+        $timestamp = time();
+        $folderPath = __DIR__ . '/../output';
+        $fileName = "{$filename}_{$timestamp}.sql";
+
+        if (!file_exists($folderPath)) {
+            mkdir($folderPath);
+            @chmod($folderPath, 0777);
+        }
+
+        $file = fopen("{$folderPath}/{$fileName}", 'w');
+        fwrite($file, "$sql");
+        fclose($file);
+
+        return $fileName;
     }
 }

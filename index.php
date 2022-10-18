@@ -1,49 +1,26 @@
 <?php
-// Function prepareCsv - Arrumar em um array para tratar com mais facilidade na montagem
-
 namespace classes;
 
 require_once(__DIR__ . '/util/utils.php');
 require_once(__DIR__ . '/classes/Requisicao.php');
 
-$file = fopen(__DIR__ . '/csv/example.csv', 'r');
+$filePath = __DIR__ . '/csv/example.csv';
+
+$options = [];
+$options['separator'] = ',';
+$options['skip_rows'] = [1];
+// $options['columns'] = [2];
+// $options['condicoes'] = ['item > 0'];
+
 $requisicao = new Requisicao;
-
-$line = '';
-$separator = ',';
-
 $requisicao->setTable('dummy_table');
-$requisicao->setColunas(['col1', 'col2']);
-$condicoes = [];
-
-$counter = 1;
-
-while (!feof($file)) {
-    $line = fgets($file);
-
-    if (empty($line)) {
-        continue;
-    }
-
-    // if ($counter === 1) {
-    //     $counter++;
-    //     continue;
-    // }
-
-    $line = explode($separator, $line);
-
-    $condicoes[] = "1 = 1";
-    $requisicao->addUpdate($line, $condicoes);
-
-    $condicoes = [];
-}
+$requisicao->setColumns(['item', 'valor', 'id']);
+$requisicao->buildFromCsv($filePath, $options);
 
 if (isset($_POST['gerar_sql'])) {
     $query = $requisicao->getQuery('update');
     $fileName = $requisicao->sqlToFile($query);
 }
-
-fclose($file);
 ?>
 
 <form action=<?= $_SERVER['PHP_SELF'] ?> method="POST">
