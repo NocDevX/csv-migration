@@ -1,8 +1,9 @@
 <?php
+
 namespace classes;
 
 require_once(__DIR__ . '/util/utils.php');
-require_once(__DIR__ . '/classes/Requisicao.php');
+require_once(__DIR__ . '/classes/Request.php');
 
 $filePath = __DIR__ . '/csv/example.csv';
 
@@ -10,14 +11,18 @@ $options = [];
 $options['separator'] = ',';
 $options['skip_rows'] = [1];
 // $options['columns'] = [2];
-// $options['condicoes'] = ['item > 0'];
+$options['conditions'] = [
+    'id_item' => '$1$',
+    'id_me' => '$1$',
+];
 
-$requisicao = new Requisicao;
-$requisicao->setTable('dummy_table');
-$requisicao->setColumns(['item', 'valor', 'id']);
-$requisicao->buildFromCsv($filePath, $options);
+$requisicao = new Request;
+$requisicao->setTable('db_itensmenu');
+$requisicao->setColumns(['id_item', 'help', 'test']);
 
 if (isset($_POST['gerar_sql'])) {
+    $requisicao->buildFromCsv($filePath, $options);
+
     $query = $requisicao->getQuery('update');
     $fileName = $requisicao->sqlToFile($query);
 }

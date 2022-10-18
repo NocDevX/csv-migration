@@ -4,45 +4,90 @@ namespace classes;
 
 use Exception;
 
-class Requisicao
+class Request
 {
     private $_table = '';
     private $_insert = [];
     private $_colunas = [];
     private $_update = [];
 
-    // Rework needed
-    public function addInsert($valores)
+    protected function buildConditions($data = [], $options = [])
     {
-        $valores = implode(',', $valores);
-        $this->_insert[] = "INSERT INTO {$this->_table} ({$this->_colunas}) VALUES ({$valores})";
+        $conditions = [];
+        $conditions = empty($options['conditions']) ? [] : $options['conditions'];
+
+        if (empty($conditions)) {
+            return '';
+        }
+
+        foreach ($conditions as $key => $val) {
+            if (strpos($val, '$') !== false) {
+                preg_match('/\$\w+\$/', $val, $matches);
+
+                $matches = str_replace('$', '', $matches[0]);
+                $matches--;
+
+                if (array_key_exists($matches, $data)) {
+                    if (floatval($data[$matches]) > 0) {
+                        $conditions[$key] = "$key = $data[$matches]";
+                    } else {
+                        $conditions[$key] = "$key = '{$data[$matches]}'";
+                    }
+                }
+            } else {
+                $conditions[$key] = "$key = $val";
+            }
+        }
+
+        $conditions = implode(' AND ', $conditions);
+        return "WHERE $conditions";
     }
 
     public function addUpdate($values, $options)
     {
-        $updatePairs = [];
-        foreach ($values as $key => $val) {
-            $updatePairs[$this->_colunas[$key]] = $val;
+        $conditions = $this->buildConditions($values, $options);
+
+        if (!empty($options['columns'])) {
+            $values = $this->removeFilteredValues($values, $options);
         }
 
-        $updatePairsSql = '';
-        foreach ($updatePairs as $column => $value) {
-            $updatePairsSql .= "$column = '$value', ";
+        $updatePairs = [];
+        foreach ($values as $key => $val) {
+            if (array_key_exists($key, $this->_colunas)) {
+                $updatePairs[$key] = "{$this->_colunas[$key]} = '{$val}'";
 
-            if (floatval($value) > 0) {
-                $updatePairsSql .= "$column = $value, ";
+                if (floatval($val)) {
+                    $updatePairs[$key] = "{$this->_colunas[$key]} = {$val}";
+                }
             }
         }
 
-        $updatePairsSql = rtrim($updatePairsSql, ', ');
-        $updatePairsSql = "UPDATE {$this->_table} SET {$updatePairsSql}";
+        $updatePairsSql = implode(', ', $updatePairs);
+        $updatePairsSql = "UPDATE {$this->_table} SET {$updatePairsSql} ";
 
-        if (!empty($options['condicoes'])) {
-            $condicoes = implode(' AND ', $options['condicoes']);
-            $updatePairsSql .= " WHERE {$condicoes}";
+        if (!empty($conditions)) {
+            $updatePairsSql .= $conditions;
         }
 
+        $updatePairsSql = trim($updatePairsSql);
+        $updatePairsSql .= ';';
+
         $this->_update[] = $updatePairsSql;
+    }
+
+    protected function removeFilteredValues($data, $options = [])
+    {
+        if (empty($options['columns'])) {
+            return $data;
+        }
+
+        foreach ($data as $key => $values) {
+            if (!in_array($key + 1, $options['columns'])) {
+                unset($data[$key]);
+            }
+        }
+
+        return $data ?: [];
     }
 
     public function setTable($tableName)
@@ -112,9 +157,12 @@ class Requisicao
             $row = fgets($file);
 
             if (!in_array($lineCounter, $skipRows)) {
-                $rowData = $this->getColumns($row, $options);
-                $this->addUpdate($rowData, $options);
-            };
+
+                if (!empty($row)) {
+                    $rowData = $this->getColumns($row, $options);
+                    $this->addUpdate($rowData, $options);
+                }
+            }
 
             $lineCounter++;
         }
@@ -131,15 +179,15 @@ class Requisicao
         $rowData = preg_replace($regex, '', $row);
         $rowData = explode($separator, $rowData);
 
-        if (!empty($options['columns'])) {
-            $rowDataSpecificColumns = [];
+        // if (!empty($options['columns'])) {
+        //     $rowDataSpecificColumns = [];
 
-            foreach ($columns as $index) {
-                $rowDataSpecificColumns[$index - 1] = $rowData[$index - 1];
-            }
+        //     foreach ($columns as $index) {
+        //         $rowDataSpecificColumns[$index - 1] = $rowData[$index - 1];
+        //     }
 
-            $rowData = $rowDataSpecificColumns;
-        }
+        //     $rowData = $rowDataSpecificColumns;
+        // }
 
         return $rowData;
     }
@@ -156,6 +204,8 @@ class Requisicao
         }
 
         $file = fopen("{$folderPath}/{$fileName}", 'w');
+        @chmod("$folderPath/$fileName", 0777);
+
         fwrite($file, "$sql");
         fclose($file);
 
