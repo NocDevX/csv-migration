@@ -7,15 +7,14 @@ use Exception;
 require_once(__DIR__ . '/classes/Builder.php');
 
 if (empty($_FILES['file']['tmp_name'])) {
-    throw new Exception('Arquivo não encontrado!');
+    throw new Exception('Arquivo não fornecido!');
 }
 
 $builder = new Builder;
 $builder = $builder->getBuilderInstance('insert');
 
 $tmpFilePath = $_FILES['file']['tmp_name'];
-$folderPath = __DIR__ . '/tmp/';
-$fileName = empty($_FILES['file']['name']) ? $_FILES['file']['name'] : $_FILES['file']['name'];
+$fileName = $_FILES['file']['name'];
 
 $options = [];
 $options['conditions'] = [
@@ -24,7 +23,7 @@ $options['conditions'] = [
 ];
 $options['separator'] = ';';
 
-$builder->createFileFromUpload($tmpFilePath, $folderPath, $fileName);
+$builder->createFileFromUpload($tmpFilePath, $fileName);
 $builder->setTable('db_itensmenu');
 $builder->setColumns(['id_item', 'help']);
 
@@ -33,3 +32,6 @@ if (isset($_POST['gerar_sql'])) {
     $query = $builder->getQuery(true);
     $builder->saveSqlToFile($query);
 }
+?>
+
+Se nao deu erro ta tudo certo. Provavelmente.

@@ -4,6 +4,7 @@ namespace classes;
 
 require_once(__DIR__ . '/../interfaces/QueryBuilderInterface.php');
 
+use Exception;
 use interfaces\QueryBuilderInterface;
 
 class QueryBuilder implements QueryBuilderInterface
@@ -45,6 +46,45 @@ class QueryBuilder implements QueryBuilderInterface
     public function addQuery($query)
     {
         $this->_query[] = $query;
+    }
+
+    protected function buildRowData($row, $options = [])
+    {
+        $separator = empty($options['separator']) ? ',' : $options['separator'];
+        $regex = empty($options['remove_regex']) ? '/\r|\n/' : $options['remove_regex'];
+
+        $rowData = preg_replace($regex, '', $row);
+        $rowData = explode($separator, $rowData);
+
+        return $rowData;
+    }
+
+    public function buildQueryFromCsv($options = [])
+    {
+        $file = fopen($this->getFile(), 'r');
+        $rowData = [];
+        $lineCounter = 1;
+        $skipRows = empty($options['skip_rows']) ? [] : $options['skip_rows'];
+
+        if (empty($file)) {
+            throw new Exception('Arquivo não encontrado');
+        }
+
+        while (!feof($file)) {
+            $row = fgets($file);
+
+            if (!in_array($lineCounter, $skipRows)) {
+
+                if (!empty($row)) {
+                    $rowData = $this->buildRowData($row, $options);
+                    $this->buildUpdate($rowData, $options);
+                }
+            }
+
+            $lineCounter++;
+        }
+
+        fclose($file);
     }
 
     protected function buildConditions($data = [], $options = [])
@@ -104,18 +144,26 @@ class QueryBuilder implements QueryBuilderInterface
         return $this->_file;
     }
 
-    public function createFileFromUpload($filePath, $folderPath, $fileName = 'dump')
+    public function createFileFromUpload($filePath, $fileName = 'dump')
     {
+        $folderPath = __DIR__ . '/../tmp';
+
         if (!file_exists($folderPath)) {
             mkdir($folderPath);
             @chmod($folderPath, 0777);
         }
 
-        $timestamp = time();
-        $fileName = "{$fileName}_{$timestamp}.csv";
+        $fileInfo = pathinfo($fileName);
+
+        if (empty($fileInfo['extension']) || $fileInfo['extension'] !== 'csv') {
+            throw new Exception('Formato não suportado');
+        }
+
+        $fileName = "{$fileName}";
         $newFilePath = "{$folderPath}/{$fileName}";
 
         move_uploaded_file($filePath, $newFilePath);
+        @chmod($newFilePath, 0777);
 
         $this->setFile($newFilePath);
     }
