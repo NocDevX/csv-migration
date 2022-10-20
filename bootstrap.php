@@ -30,8 +30,19 @@ $builder->setColumns(['id_item', 'help']);
 if (isset($_POST['gerar_sql'])) {
     $builder->buildQueryFromCsv($options);
     $query = $builder->getQuery(true);
-    $builder->saveSqlToFile($query);
+    $sqlFileName = $builder->saveSqlToFile($query);
 }
+
+$sqlFileName = empty($sqlFileName) ? '' : $sqlFileName;
 ?>
 
-Se nao deu erro ta tudo certo. Provavelmente.
+<head>
+    <link rel="stylesheet" href="./style/styles.css"/>
+</head>
+
+<body>
+    <div class="container">
+        <a class="file" href="<?= $sqlFileName ? "output/{$sqlFileName}" : '' ?>"><?= $sqlFileName ? $sqlFileName : 'Nenhum arquivo foi gerado.' ?></a>
+        <a class="home" href="index.php">Voltar ao início</a>
+    </div>
+</body>

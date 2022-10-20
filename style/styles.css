@@ -1,0 +1,43 @@
+.file, .home {
+    display: block;
+    width: fit-content;
+    text-decoration: none;
+    color: #eee;
+    background-color: #333;
+    padding: 10px;
+    margin-top: 10px;
+    margin-right: 10px;
+    transition: .2s;
+}
+
+.file:hover {
+    color: #eee;
+    background: #007f5f;
+}
+
+.home:hover {
+    color: #333;
+    background-color: #ccc;
+}
+
+.container {
+    display: flex;
+    justify-content: center;
+}
+
+.select {
+    color: red;
+    border: 0;
+    padding: 5px;
+    outline: none;
+    margin: auto 10px;
+    width: fit-content;
+}
+
+.d-flex {
+    display: flex;
+}
+
+.flex-column {
+    flex-direction: column;
+}
